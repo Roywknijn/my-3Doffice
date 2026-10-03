@@ -3,7 +3,7 @@ export type GatewayState = 'Running' | 'Stopped' | 'Unknown'
 export interface Source<T> { availability: Availability; data: T; error?: { code: string; message: string } }
 export interface RuntimeSnapshot {
   /** Every Hermes profile is an agent; `gateway` comes from `hermes profile list`. */
-  profiles: Source<{ name: string; model: string; gateway: GatewayState }[]>
+  profiles: Source<{ name: string; model: string; gateway: GatewayState; label?: string }[]>
   fetchedAt: string
 }
 export interface Task { title: string; status: string; id?: string; assignee?: string; priority?: number; board?: string }
@@ -28,6 +28,8 @@ export interface OfficeStation {
   /** Agent id is the Hermes profile name and the key for its folder and memory. */
   id: string
   name: string
+  /** Hermes alias or display name; shown above the agent instead of `name` when set. */
+  label?: string
   role: string
   room: OfficeRoom
   roomPosition: string

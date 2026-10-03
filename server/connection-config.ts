@@ -145,7 +145,8 @@ function invocation(command: string, args: string[], shown: string): { file: str
   const remoteLabel = [...remote.slice(0, remote.length - args.length), shown].join(' ')
   // A dashboard refresh can issue several fixed reads. Reuse one authenticated SSH transport
   // so the VPS is not asked to establish many connections at once.
-  const controlPath = resolve(tmpdir(), 'mycompany-ssh-%C')
+  // Unix sockets are limited to ~104 bytes and macOS tmpdir() alone uses ~50, so prefer /tmp.
+  const controlPath = resolve(process.platform === 'win32' ? tmpdir() : '/tmp', 'mycompany-ssh-%C')
   const sshArgs = ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=8', '-o', 'ControlMaster=auto', '-o', 'ControlPersist=60', '-o', `ControlPath=${controlPath}`, '-p', String(current.sshPort), ...(current.sshIdentityFile ? ['-i', current.sshIdentityFile] : []), `${current.sshUser}@${current.sshHost}`, ...remote]
   return { file: 'ssh', args: sshArgs, label: `ssh ${current.sshUser}@${current.sshHost} ${remoteLabel}` }
 }

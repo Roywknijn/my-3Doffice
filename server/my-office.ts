@@ -1,7 +1,7 @@
 import { execFile as execFileCallback } from 'node:child_process'
 import { activeOfficeInteractions, clearOfficeInteractions, parseOfficeInteractions, type OfficeInteraction } from './office-interactions.js'
 import { promisify } from 'node:util'
-import { hermesEnvironment, hermesInvocation, hermesShellInvocation } from './connection-config.js'
+import { getConnectionConfig, hermesEnvironment, hermesInvocation, hermesShellInvocation } from './connection-config.js'
 import { gatewayBusy, parseRuntimeState, RUNTIME_SCRIPT, visibleSubagents, type HermesRuntimeState, type Subagent } from './hermes-runtime.js'
 
 const execFile = promisify(execFileCallback)
@@ -10,13 +10,18 @@ const INSIGHTS_CACHE_MS = 60_000
 const COMMAND_TIMEOUT_MS = 8_000
 const COMMAND_LOG_LIMIT = 100
 const LOG_TAIL_LINES = 200
-const SERIAL_HERMES_CONCURRENCY = 1
+// Remote reads share one ControlMaster transport, so a few channels add no new SSH connections.
+const REMOTE_HERMES_CONCURRENCY = 3
+const LOCAL_FRESH_MS = 30_000
+// One cycle over SSH/Docker is ~2 reads per profile; a 30 s window would mark every agent Unknown.
+const REMOTE_FRESH_MS = 90_000
 
 export type Availability = 'available' | 'unavailable'
 export type GatewayState = 'Running' | 'Stopped' | 'Unknown'
 
 /** A Hermes profile; every profile is one agent. `gateway` comes from the profile list. */
-export interface Profile { name: string; model: string; gateway: GatewayState }
+/** `label` is the Hermes alias, else the display name ("Boss (default)"); shown instead of the id. */
+export interface Profile { name: string; model: string; gateway: GatewayState; label?: string }
 export interface Source<T> {
   availability: Availability
   data: T
@@ -50,6 +55,8 @@ export interface OfficeStation {
   /** Agent id: the Hermes profile name and the key for its folder and memory. */
   id: string
   name: string
+  /** Hermes alias or display name; the 3D office shows it instead of `name` when set. */
+  label?: string
   role: string
   room: OfficeRoom
   roomPosition: string
@@ -73,7 +80,7 @@ export interface OfficeSnapshot { stations: OfficeStation[]; interactions?: Offi
 export interface HermesRuntimeSnapshot { state: Source<HermesRuntimeState>; fetchedAt: string }
 export interface OfficeSummary { declared: number; active: number; idle: number; offline: number; unknown: number; gatewaysReachable: number; gatewaysDeclared: number }
 export interface ExplicitOfficeState { station: OfficeStation['name']; state: 'Working' | 'Reviewing' | 'Collaborating'; expiresAt: string }
-export interface OfficeBuildOptions { now?: string | number; explicitStates?: ExplicitOfficeState[]; agentActivity?: AgentActivitySnapshot; hermesRuntime?: HermesRuntimeSnapshot }
+export interface OfficeBuildOptions { now?: string | number; freshMs?: number; explicitStates?: ExplicitOfficeState[]; agentActivity?: AgentActivitySnapshot; hermesRuntime?: HermesRuntimeSnapshot }
 export interface UsageInsights {
   days: number
   sessions: number
@@ -138,9 +145,9 @@ function toInt(value: string | undefined): number {
 // ---------------------------------------------------------------------------
 // Parsers. Formats follow the Hermes CLI (hermes_cli/*) as printed to a pipe.
 
-const PROFILE_ROW = /^(.+?)\s+(\S+)\s+(running|stopped)(?:\s|$)/i
+const PROFILE_ROW = /^(.+?)\s+(\S+)\s+(running|stopped)(?:\s+(\S+))?(?:\s|$)/i
 
-interface ProfileRow { name: string; model: string; gateway: GatewayState }
+interface ProfileRow { name: string; model: string; gateway: GatewayState; label?: string }
 
 function profileRows(output: string): ProfileRow[] {
   const all = lines(output)
@@ -154,10 +161,13 @@ function profileRows(output: string): ProfileRow[] {
     if (!match) return []
     // A display name renders as "Display Name (id)"; the id is the stable profile name.
     const displayed = match[1].trim()
-    const name = displayed.match(/\(([\w.-]+)\)$/)?.[1] ?? displayed
+    const named = displayed.match(/^(.+?)\s*\(([\w.-]+)\)$/)
+    const name = named?.[2] ?? displayed
+    const alias = withGateway?.[4] && withGateway[4] !== '—' ? withGateway[4] : undefined
+    const label = alias ?? named?.[1]
     const model = match[2] === '—' ? 'Not configured' : match[2]
     const gateway: GatewayState = withGateway ? (withGateway[3].toLowerCase() === 'running' ? 'Running' : 'Stopped') : 'Unknown'
-    return [{ name, model, gateway }]
+    return [{ name, model, gateway, ...(label ? { label } : {}) }]
   })
 }
 
@@ -422,7 +432,7 @@ let activeHermesReads = 0
 const waitingHermesReads: (() => void)[] = []
 
 async function withHermesSlot<T>(work: () => Promise<T>): Promise<T> {
-  if (activeHermesReads >= SERIAL_HERMES_CONCURRENCY) await new Promise<void>((resolve) => waitingHermesReads.push(resolve))
+  if (activeHermesReads >= REMOTE_HERMES_CONCURRENCY) await new Promise<void>((resolve) => waitingHermesReads.push(resolve))
   activeHermesReads += 1
   try { return await work() } finally {
     activeHermesReads -= 1
@@ -891,11 +901,11 @@ export async function collectAgentActivity(profiles: readonly string[], run: Run
 // Office
 
 /** One office station per Hermes profile. */
-interface AgentSpec { id: string; role: string; profile: string; gateway?: GatewayState; aliases: string[] }
+interface AgentSpec { id: string; role: string; profile: string; gateway?: GatewayState; label?: string; aliases: string[] }
 
 export function agentRoster(runtime: RuntimeSnapshot): AgentSpec[] {
   const profiles = runtime.profiles.availability === 'available' ? runtime.profiles.data : []
-  return profiles.filter((profile) => PROFILE_NAME.test(profile.name)).map((profile) => ({ id: profile.name, role: 'Hermes profile', profile: profile.name, gateway: profile.gateway, aliases: [profile.name.toLowerCase()] }))
+  return profiles.filter((profile) => PROFILE_NAME.test(profile.name)).map((profile) => ({ id: profile.name, role: 'Hermes profile', profile: profile.name, gateway: profile.gateway, ...(profile.label ? { label: profile.label } : {}), aliases: [profile.name.toLowerCase()] }))
 }
 
 export const officeRooms = [
@@ -926,9 +936,14 @@ function collaborationState(sessions: Session[], aliases: readonly string[]): Of
   return sessions.some((session) => session.active === true && session.actor && aliases.includes(session.actor.trim().toLowerCase())) ? 'Collaborating' : 'Unknown'
 }
 
-function isFresh(fetchedAt: string, now: number): boolean {
+function isFresh(fetchedAt: string, now: number, freshMs = LOCAL_FRESH_MS): boolean {
   const timestamp = Date.parse(fetchedAt)
-  return Number.isFinite(timestamp) && timestamp <= now + 1_000 && now - timestamp <= 30_000
+  return Number.isFinite(timestamp) && timestamp <= now + 1_000 && now - timestamp <= freshMs
+}
+
+function officeFreshMs(): number {
+  const config = getConnectionConfig()
+  return config.mode === 'ssh' || config.dockerContainer ? REMOTE_FRESH_MS : LOCAL_FRESH_MS
 }
 
 function explicitState(agent: AgentSpec, states: ExplicitOfficeState[], now: number): OfficeState | undefined {
@@ -967,13 +982,14 @@ function liveState(agent: AgentSpec, snapshot: AgentActivitySnapshot | undefined
 export function buildOfficeSnapshot(runtime: RuntimeSnapshot, board: TaskBoardSnapshot, activity: ActivitySnapshot, options: OfficeBuildOptions = {}): OfficeSnapshot {
   const fetchedAt = new Date().toISOString()
   const now = typeof options.now === 'number' ? options.now : options.now ? Date.parse(options.now) : Date.now()
-  const freshRuntime = isFresh(runtime.fetchedAt, now)
-  const freshBoard = board.tasks.availability === 'available' && isFresh(board.fetchedAt, now)
-  const freshActivity = activity.sessions.availability === 'available' && isFresh(activity.fetchedAt, now)
-  const agentActivity = options.agentActivity && isFresh(options.agentActivity.fetchedAt, now) ? options.agentActivity : undefined
+  const freshMs = options.freshMs ?? LOCAL_FRESH_MS
+  const freshRuntime = isFresh(runtime.fetchedAt, now, freshMs)
+  const freshBoard = board.tasks.availability === 'available' && isFresh(board.fetchedAt, now, freshMs)
+  const freshActivity = activity.sessions.availability === 'available' && isFresh(activity.fetchedAt, now, freshMs)
+  const agentActivity = options.agentActivity && isFresh(options.agentActivity.fetchedAt, now, freshMs) ? options.agentActivity : undefined
   const explicitStates = options.explicitStates ?? []
   const roster = agentRoster(runtime)
-  const hermesRuntime = options.hermesRuntime?.state.availability === 'available' && isFresh(options.hermesRuntime.fetchedAt, now) ? options.hermesRuntime.state.data : undefined
+  const hermesRuntime = options.hermesRuntime?.state.availability === 'available' && isFresh(options.hermesRuntime.fetchedAt, now, freshMs) ? options.hermesRuntime.state.data : undefined
   const owners = new Set(roster.map((agent) => agent.id))
   const subagents = hermesRuntime && visibleSubagents(hermesRuntime).filter((subagent) => owners.has(subagent.owner)).map((subagent) => ({ ...subagent, ...(subagent.goal ? { goal: redactLogLine(subagent.goal, 160) } : {}) }))
   const stations = roster.map((agent, index): OfficeStation => {
@@ -1013,6 +1029,7 @@ export function buildOfficeSnapshot(runtime: RuntimeSnapshot, board: TaskBoardSn
     return {
       id: agent.id,
       name: agent.id,
+      ...(agent.label ? { label: agent.label } : {}),
       role: agent.role,
       ...roomForState(state, index),
       seat: index + 1,
@@ -1197,7 +1214,7 @@ export async function getOffice(now = Date.now()): Promise<OfficeSnapshot> {
   const agentActivity = agentActivitySource.peek()
   const hermesRuntime = hermesRuntimeSource.peek()
   warmOfficeData(now)
-  return buildOfficeSnapshot(runtime, board, activity, { agentActivity, hermesRuntime })
+  return buildOfficeSnapshot(runtime, board, activity, { agentActivity, hermesRuntime, freshMs: officeFreshMs() })
 }
 
 export async function getDashboard(now = Date.now()): Promise<DashboardSnapshot> {
@@ -1213,6 +1230,6 @@ export async function getDashboard(now = Date.now()): Promise<DashboardSnapshot>
   const usage = insightsSource.peek() ?? { availability: 'unavailable' as const, data: null }
   const agentActivity = agentActivitySource.peek()
   warmDashboardData(now)
-  const office = buildOfficeSnapshot(runtime, board, activity, { agentActivity, hermesRuntime })
+  const office = buildOfficeSnapshot(runtime, board, activity, { agentActivity, hermesRuntime, freshMs: officeFreshMs() })
   return buildDashboard({ runtime, board, calendar, activity, skills, channels, office, usage, commands: commandHealth() })
 }

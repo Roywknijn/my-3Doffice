@@ -61,9 +61,21 @@ describe('Hermes profile list', () => {
   it('reads display-name ids, long names and unset models by column', () => {
     expect(parseProfiles(profileList)).toEqual([
       { name: 'default', model: 'anthropic/claude-sonnet-4', gateway: 'Running' },
-      { name: 'coder', model: 'openai/gpt-5.5', gateway: 'Stopped' },
+      { name: 'coder', model: 'openai/gpt-5.5', gateway: 'Stopped', label: 'ch' },
       { name: 'scratch', model: 'Not configured', gateway: 'Stopped' },
     ])
+  })
+
+  it('labels a profile by its alias, else by its display name', () => {
+    const output = [
+      ' Profile          Model                        Gateway      Alias        Distribution',
+      ' ───────────────    ───────────────────────────    ───────────    ───────────    ────────────────────',
+      ' ◆Boss (default)  deepseek-v4.1-flash          running      —            —',
+      '  analyst         deepseek-v4.1-flash          stopped      —            —',
+      '  data-content    deepseek-v4.1-flash          stopped      sari         —',
+      '  research-agent  claude-3-haiku               stopped      research-agent —',
+    ].join('\n')
+    expect(parseProfiles(output).map((profile) => [profile.name, profile.label])).toEqual([['default', 'Boss'], ['analyst', undefined], ['data-content', 'sari'], ['research-agent', 'research-agent']])
   })
 
   it('derives the default gateway from the profile table', async () => {

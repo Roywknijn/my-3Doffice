@@ -358,16 +358,16 @@ export default function Office3D({ stations, interactions = NO_INTERACTIONS, sub
         const badge = officeStateBadge(station.state)
         const busy = ['Working', 'Reviewing', 'Collaborating'].includes(station.state)
         const placement = placements.get(station.id)!
-        return <button key={station.id} ref={register(labels, `agent-${station.id}`)} type="button" className={`agent-tag-3d state-${station.state.toLowerCase()}${placement.intent === 'meeting' ? ' in-meeting' : ''}`} onClick={(event) => onSelect(station, event.currentTarget)} aria-label={`${station.name}. ${station.state}. ${placement.label}. Open station details.`}>
-          {placement.intent !== 'meeting' && <span className="speech speech-3d">{placement.intent !== 'desk' ? placement.label : busy && station.activity ? station.activity : placement.label}</span>}
-          <span className="agent-tag-row"><span className="pixel-station-name">{officeRole(station.id) === 'ceo' ? 'CEO · ' : ''}{station.name}</span>{placement.intent !== 'meeting' && <span className={`badge ${badge.tone}`}>{station.state}</span>}</span>
+        return <button key={station.id} ref={register(labels, `agent-${station.id}`)} type="button" className={`agent-tag-3d state-${station.state.toLowerCase()}${placement.intent === 'meeting' ? ' in-meeting' : ''}`} onClick={(event) => onSelect(station, event.currentTarget)} aria-label={`${station.label ?? station.name}. ${station.state}. ${placement.label}. Open station details.`}>
+          {placement.intent === 'handoff' ? <span className="speech speech-3d">{placement.label}</span> : placement.intent !== 'meeting' && busy && station.activity && <span className="speech speech-3d">{station.activity}</span>}
+          <span className="agent-tag-row"><span className="pixel-station-name">{officeRole(station.id) === 'ceo' ? 'CEO · ' : ''}{station.label ?? station.name}</span>{placement.intent !== 'meeting' && <span className={`badge ${badge.tone}`}>{station.state}</span>}</span>
         </button>
       })}
       {visibleSubagents.map((subagent) => {
         const placement = subagentSpots.get(subagent.id)!
         return <div key={subagent.id} ref={register(labels, `sub-${subagent.id}`)} className={`agent-tag-3d subagent-tag-3d state-${subagent.status === 'working' ? 'working' : 'idle'}`} role="note" aria-label={`Subagent ${subagent.index + 1} of ${subagent.owner}. ${placement.label}.`} title={subagent.goal}>
           <span className="speech speech-3d">{placement.label}</span>
-          <span className="agent-tag-row"><span className="pixel-station-name">Subagen {subagent.index + 1} · {subagent.owner}</span><span className={`badge ${subagent.status === 'working' ? 'good' : 'muted'}`}>{subagent.status === 'working' ? 'Working' : 'Selesai'}</span></span>
+          <span className="agent-tag-row"><span className="pixel-station-name">Subagen {subagent.index + 1} · {stations.find((s) => s.id === subagent.owner)?.label ?? subagent.owner}</span><span className={`badge ${subagent.status === 'working' ? 'good' : 'muted'}`}>{subagent.status === 'working' ? 'Working' : 'Selesai'}</span></span>
         </div>
       })}
     </div>
