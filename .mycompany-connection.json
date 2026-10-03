@@ -1,0 +1,5 @@
+{
+  "mode": "local",
+  "hermesCommand": "hermes",
+  "hermesHome": "/opt/data"
+}
