@@ -1,6 +1,6 @@
 # StoneBox SaaS AI+ERP · Hermes 3D Virtual Office
 
-> Developed by Ukan
+> Developed by Roy W Knijn @Copyright 2026 PT StoneBox Ananta Integrasi
 
 StoneBox SaaS AI+ERP is a read-only 3D workspace for a Hermes Agent team. It turns the agents discovered from Hermes into a living office: see who is active, inspect Kanban work, schedules, sessions, memory, folders, logs, and visualize collaboration without sending tasks or commands to an agent.
 
