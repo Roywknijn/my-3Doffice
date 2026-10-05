@@ -2,12 +2,14 @@ import { useFrame } from '@react-three/fiber'
 import { forwardRef, useRef } from 'react'
 import * as THREE from 'three'
 import { billiardShot } from '../idle-activities.ts'
+import { Steam } from './ambient.tsx'
 
 export const CoffeeMug = forwardRef<THREE.Group>(function CoffeeMug(_, ref) {
   return <group ref={ref} visible={false}>
     <mesh castShadow><cylinderGeometry args={[0.095, 0.075, 0.16, 16]}/><meshStandardMaterial color="#faf2dc" roughness={0.35}/></mesh>
     <mesh position={[0, 0.081, 0]}><cylinderGeometry args={[0.077, 0.077, 0.004, 16]}/><meshStandardMaterial color="#492713"/></mesh>
     <mesh position={[0.1, 0, 0]}><torusGeometry args={[0.057, 0.016, 8, 16]}/><meshStandardMaterial color="#faf2dc"/></mesh>
+    <Steam position={[0, 0.09, 0]} size={0.02} height={0.28} speed={0.55}/>
   </group>
 })
 
@@ -32,9 +34,15 @@ export function BilliardBalls({ x, players }: { x: number; players: { slot: numb
 
 export function LoungeTV({ x }: { x: number }) {
   const scene = useRef<THREE.Group>(null)
-  useFrame(({ clock }) => { if (scene.current) scene.current.position.x = Math.sin(clock.elapsedTime * 0.35) * 0.45 })
+  const sky = useRef<THREE.MeshBasicMaterial>(null)
+  useFrame(({ clock }) => {
+    const t = clock.elapsedTime
+    if (scene.current) scene.current.position.x = Math.sin(t * 0.35) * 0.45
+    // The programme drifts through a few moods and the panel flickers a little, like a real television.
+    sky.current?.color.setHSL(0.55 + Math.sin(t * 0.11) * 0.07, 0.42, 0.62 + Math.sin(t * 2.3) * 0.015 + Math.sin(t * 17) * 0.01)
+  })
   return <group position={[x + 3.2, 1.55, -0.965]}>
-    <mesh><planeGeometry args={[2.33, 1.22]}/><meshBasicMaterial color="#8bbacf"/></mesh>
+    <mesh><planeGeometry args={[2.33, 1.22]}/><meshBasicMaterial ref={sky} color="#8bbacf"/></mesh>
     <mesh position={[0, -0.38, 0.003]}><planeGeometry args={[2.33, 0.46]}/><meshBasicMaterial color="#72976b"/></mesh>
     <mesh position={[0.75, 0.35, 0.004]}><circleGeometry args={[0.13, 24]}/><meshBasicMaterial color="#ffe4a1"/></mesh>
     <group ref={scene} position={[0, 0, 0.006]}>

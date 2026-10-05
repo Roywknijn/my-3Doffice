@@ -7,7 +7,7 @@ MyCompany (package/CLI name `my-office`; repo github.com/kansaok/my-office) — 
 - `npm run dev` — Express API (`tsx watch server/index.ts`, port 7777) + Vite UI (proxies `/api` → 7777)
 - `npm run build` — `tsc -b` + `vite build` (→ `dist/`) + server compile (→ `build/server/`)
 - `npm start` / `my-office --port N` — `bin/my-office.js` imports `build/server/index.js`; serves `dist/` too. Restart after backend changes.
-- `npm test` (vitest, 19 files / 132 tests), `npm run lint`
+- `npm test` (vitest, 20 files / 136 tests), `npm run lint`
 - CI (`.github/workflows/ci.yml`): lint, test, build, `npm pack` smoke test. Release on tag `v*` must match `package.json` version; attaches `my-office.tgz` that `install.sh` downloads.
 
 ## Architecture
