@@ -1,4 +1,4 @@
-# Kantor 3D MyCompany
+# Kantor 3D StoneBox SaaS AI+ERP
 
 `default` mendapat ruangan CEO. Setiap profile dengan nama mengandung `manager`
 (tidak peka huruf besar/kecil) mendapat ruangan sendiri. Profile lainnya mendapat
@@ -29,7 +29,7 @@ Hermes, konsumsi token model, atau perubahan tugas dari aktivitas dekoratif ini.
 
 ## Subagen otomatis (`delegate_task`)
 
-Tanpa integrasi tambahan, MyCompany membaca berkas runtime Hermes setiap polling
+Tanpa integrasi tambahan, StoneBox SaaS AI+ERP membaca berkas runtime Hermes setiap polling
 office (cache 10 detik), lewat satu skrip `sh` baca-saja yang tetap, dijalankan di
 tempat Hermes berada (lokal, `docker exec`, atau SSH):
 
@@ -52,7 +52,7 @@ terlewat, kecuali tetap terlihat sebagai "melapor" selama 1 menit setelah selesa
 ## Event delegasi antar-profile
 
 Log aktivitas umum Hermes tidak selalu menyimpan pasangan pengirim/penerima.
-MyCompany tidak menebaknya dari status `Working`/`Collaborating` atau kesamaan
+StoneBox SaaS AI+ERP tidak menebaknya dari status `Working`/`Collaborating` atau kesamaan
 judul tugas. Integrasi yang melakukan delegasi perlu mengirim event berikut
 **setelah** delegasi asli berhasil:
 
@@ -62,7 +62,7 @@ curl -X POST http://127.0.0.1:7777/api/office/interactions \
   -d '{"id":"task-123-handoff-1","from":"project-manager","to":"coding-agent","label":"Implementasi login","durationSeconds":90}'
 ```
 
-Nama harus sama dengan profile yang sudah tersedia di MyCompany. Endpoint ini
+Nama harus sama dengan profile yang sudah tersedia di StoneBox SaaS AI+ERP. Endpoint ini
 hanya menggerakkan visual, tidak memberikan tugas. ID yang sama bersifat idempotent
 selama event aktif. Durasi 15–180 detik; default 90. Event disimpan sementara dalam
 memori, hilang setelah kedaluwarsa, restart, atau pergantian koneksi Hermes.
@@ -87,6 +87,6 @@ sinkron. Marker harus masuk ke 80 baris terakhir log 3 menit terakhir. Marker bu
 format bawaan Hermes; tambahkan pada workflow/plugin delegasi yang Anda gunakan.
 Subagen `delegate_task` sudah otomatis (lihat atas); event ini untuk delegasi antar-profile.
 
-API MyCompany tetap terikat pada loopback. Dari VPS, jangan membuka port dashboard
+API StoneBox SaaS AI+ERP tetap terikat pada loopback. Dari VPS, jangan membuka port dashboard
 ke internet hanya untuk event. Gunakan marker log via SSH atau tunnel SSH khusus.
 Polling office setiap 10 detik; waktu baca Hermes dapat menambah latensi.

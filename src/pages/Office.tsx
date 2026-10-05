@@ -216,5 +216,5 @@ export function Office({ dashboard, dashboardPending = false, onNavigate }: { da
     </aside>}
     {overlay && <OfficeOverlay kind={overlay} onClose={() => setOverlay(undefined)} onNavigate={onNavigate}/>}
     {selected && <OfficeDetail station={selected} onClose={closeDetail}/>}
-  </section><div className="office-bottom-note"><span><Icon name="layers" size={14}/>MyCompany workspace</span><span className="office-credit">Developed by Ukan</span><span className="office-disclaimer">Visual activities do not send commands to Hermes.</span></div></div>
+  </section><div className="office-bottom-note"><span><Icon name="layers" size={14}/>StoneBox SaaS AI+ERP workspace</span><span className="office-credit">Developed by Ukan</span><span className="office-disclaimer">Visual activities do not send commands to Hermes.</span></div></div>
 }

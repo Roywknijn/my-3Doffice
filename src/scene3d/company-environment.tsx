@@ -74,7 +74,7 @@ export function CompanyEnvironment({ layout, tasks, available, partial, onOpenBo
     {[-1, 1].map((side) => <RBox key={side} position={[table.center[0], 0.38, table.center[2] + side * (table.length / 2 - 0.5)]} size={[1.3, 0.76, 0.15]} color="#3c493f"/>)}
     {layout.meetingSeats.map((seat, i) => <group key={i}><OfficeChair position={seat.position} rotation={seat.facing} color="#dedacb"/><RBox position={[-4.5 + (i % 2 ? 0.64 : -0.64), 0.855, seat.position[2]]} size={[0.32, 0.02, 0.25]} color="#f3f1df"/></group>)}
     {/* Coffee bar and lounge, inspired by the reference's right wing. */}
-    <Sign text="MYCOMPANY / COFFEE & IDEAS" position={[lx + 3.6, 3.25, b.minZ + 0.12]} width={5}/>
+    <Sign text="STONEBOX / COFFEE & IDEAS" position={[lx + 3.6, 3.25, b.minZ + 0.12]} width={5}/>
     <WallClock position={[lx + 0.6, 2.7, b.minZ + 0.13]}/>
     <RBox position={[lx + 3.5, 0.66, b.minZ + 1]} size={[5.6, 1.3, 0.9]} color="#967345"/>
     <RBox position={[lx + 3.5, 1.35, b.minZ + 1]} size={[5.9, 0.12, 1.1]} color="#e2d1b8"/>

@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# MyCompany (Hermes 3D Virtual Office) installer for macOS, Linux and WSL2.
+# StoneBox SaaS AI+ERP (Hermes 3D Virtual Office) installer for macOS, Linux and WSL2.
 #
 #   curl -fsSL https://raw.githubusercontent.com/kansaok/my-office/main/install.sh | bash
 #
 # Installs the latest release into ~/.local/share/my-office and a `my-office` command into
 # ~/.local/bin. Nothing is installed system-wide and sudo is never used. If no
-# suitable Node.js (20+) is found, a private copy is downloaded for MyCompany only.
+# suitable Node.js (20+) is found, a private copy is downloaded for StoneBox SaaS AI+ERP only.
 # Run it again to update. Options (pass them after `bash -s --` when piping):
 #
 #   --service        also run it as a systemd user service (Linux)
@@ -38,7 +38,7 @@ fail() { printf '\033[31mx %s\033[0m\n' "$*" >&2; exit 1; }
 
 usage() {
   cat <<'HELP'
-MyCompany · Hermes 3D Virtual Office installer (macOS, Linux, WSL2)
+StoneBox SaaS AI+ERP · Hermes 3D Virtual Office installer (macOS, Linux, WSL2)
 
   curl -fsSL https://raw.githubusercontent.com/kansaok/my-office/main/install.sh | bash
   curl -fsSL .../install.sh | bash -s -- --service
@@ -89,7 +89,7 @@ ensure_node() {
     *) fail "Unsupported CPU $(uname -m) for the bundled Node.js; install Node.js $NODE_MAJOR_MIN+ yourself and rerun." ;;
   esac
 
-  info "Node.js $NODE_MAJOR_MIN+ not found; downloading a private Node.js $NODE_MAJOR_PRIVATE for MyCompany..." >&2
+  info "Node.js $NODE_MAJOR_MIN+ not found; downloading a private Node.js $NODE_MAJOR_PRIVATE for StoneBox SaaS AI+ERP..." >&2
   local base="https://nodejs.org/dist/latest-v$NODE_MAJOR_PRIVATE.x"
   local work sums file
   work="$(mktemp -d)"
@@ -156,7 +156,7 @@ write_launcher() {
   mkdir -p "$BIN_DIR"
   cat > "$BIN_DIR/$COMMAND" <<LAUNCHER
 #!/bin/sh
-# Installed by the MyCompany installer; rerun the installer to update.
+# Installed by the StoneBox SaaS AI+ERP installer; rerun the installer to update.
 exec "$node_bin" "$INSTALL_HOME/app/lib/node_modules/$PACKAGE/bin/$COMMAND.js" "\$@"
 LAUNCHER
   chmod +x "$BIN_DIR/$COMMAND"
@@ -171,7 +171,7 @@ install_service() {
   # systemd starts services with a minimal PATH; keep the current one so `hermes` is found.
   cat > "$SERVICE_FILE" <<UNIT
 [Unit]
-Description=MyCompany, Hermes 3D Virtual Office (read-only my office)
+Description=StoneBox SaaS AI+ERP, Hermes 3D Virtual Office (read-only my office)
 After=network.target
 
 [Service]
@@ -190,7 +190,7 @@ UNIT
 }
 
 uninstall() {
-  bold "Removing MyCompany"
+  bold "Removing StoneBox SaaS AI+ERP"
   if [ -f "$SERVICE_FILE" ] && command -v systemctl >/dev/null 2>&1; then
     systemctl --user disable --now "$SERVICE_NAME" >/dev/null 2>&1 || true
     rm -f "$SERVICE_FILE"
@@ -216,7 +216,7 @@ main() {
     shift
   done
 
-  bold "Installing MyCompany · Hermes 3D Virtual Office"
+  bold "Installing StoneBox SaaS AI+ERP · Hermes 3D Virtual Office"
   need curl
   need tar
   mkdir -p "$INSTALL_HOME"
@@ -240,10 +240,10 @@ main() {
 
   local installed
   installed="$("$BIN_DIR/$COMMAND" --version)"
-  bold "MyCompany $installed installed."
+  bold "StoneBox SaaS AI+ERP $installed installed."
 
   if ! command -v hermes >/dev/null 2>&1; then
-    warn "The Hermes CLI (hermes) is not on your PATH. MyCompany reads everything through it; install Hermes Agent first."
+    warn "The Hermes CLI (hermes) is not on your PATH. StoneBox SaaS AI+ERP reads everything through it; install Hermes Agent first."
   fi
   if [ "$service" = 1 ]; then
     install_service

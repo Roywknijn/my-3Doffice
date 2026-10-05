@@ -1,7 +1,7 @@
 {
   "name": "my-office",
   "version": "0.2.0",
-  "description": "MyCompany: a 3D virtual office and read-only workspace for your Hermes Agent crew",
+  "description": "StoneBox SaaS AI+ERP: a 3D virtual office and read-only workspace for your Hermes Agent crew",
   "author": "Ukan",
   "type": "module",
   "repository": {

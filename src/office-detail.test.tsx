@@ -32,7 +32,7 @@ describe('Office characters', () => {
     const station: OfficeStation = {
       id: 'default', name: 'default', role: 'Hermes profile', room: 'Lounge', roomPosition: 'lounge-seat-1',
       state: 'Idle', currentTask: 'No attributed task', recentActivity: 'No attributed recent activity',
-      activity: 'On a break', seat: 1, provenance: 'MyCompany managed-idle placement policy', freshness: 'Runtime current',
+      activity: 'On a break', seat: 1, provenance: 'StoneBox SaaS AI+ERP managed-idle placement policy', freshness: 'Runtime current',
     }
 
     const markup = renderToStaticMarkup(<OfficeDetail station={station} onClose={vi.fn()}/>)

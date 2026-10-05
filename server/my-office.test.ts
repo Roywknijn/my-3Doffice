@@ -152,7 +152,7 @@ describe('Office snapshot', () => {
       { name: 'default', room: 'Lounge', roomPosition: 'lounge-seat-1', state: 'Idle' },
       { name: 'coder', room: 'Lounge', roomPosition: 'lounge-seat-2', state: 'Idle' },
     ])
-    expect(office.stations[0].provenance).toContain('MyCompany managed-idle placement policy')
+    expect(office.stations[0].provenance).toContain('StoneBox SaaS AI+ERP managed-idle placement policy')
     expect(office.summary).toEqual({ declared: 2, active: 0, idle: 2, offline: 0, unknown: 0, gatewaysReachable: 2, gatewaysDeclared: 2 })
   })
 
