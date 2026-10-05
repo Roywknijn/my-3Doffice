@@ -1,5 +1,8 @@
-import { useEffect, useMemo } from 'react'
+import { useFrame } from '@react-three/fiber'
+import { useEffect, useMemo, useRef } from 'react'
+import * as THREE from 'three'
 import type { CompanyLayout, Vec3 } from '../company-layout.ts'
+import { currentHour, dayCycle } from '../day-cycle.ts'
 import type { Task } from '../types.ts'
 import { Armchair, Bookshelf, Cyl, OfficeChair, Plant, RBox, Sofa, Tree, WallClock } from './props.tsx'
 import { BilliardBalls, LoungeTV } from './idle-props.tsx'
@@ -11,11 +14,21 @@ function Sign({ text, position, width = 2.5 }: { text: string; position: Vec3; w
   return <mesh position={position}><planeGeometry args={[width, width / 8]}/><meshBasicMaterial map={map}/></mesh>
 }
 
+const NIGHT_VIEW = new THREE.Color('#4b5c85')
+const DUSK_VIEW = new THREE.Color('#ffc9a0')
+const WHITE = new THREE.Color('#ffffff')
+
 export function CompanyEnvironment({ layout, tasks, available, partial, onOpenBoard, poolPlayers }: { layout: CompanyLayout; tasks: Task[]; available: boolean; partial: boolean; onOpenBoard: () => void; poolPlayers: { slot: number; arrivedAt: number }[] }) {
   const { bounds: b, loungeX: lx, table } = layout
   const width = b.maxX - b.minX; const depth = b.maxZ - b.minZ
   const floor = useMemo(() => { const t = parquetTexture(); t.repeat.set(width / 5, depth / 5); return t }, [width, depth])
   const skyline = useMemo(skylineTexture, [])
+  const view = useRef<THREE.MeshBasicMaterial>(null)
+  // The city outside follows the real time of day (see day-cycle.ts).
+  useFrame(() => {
+    const { daylight, warmth } = dayCycle(currentHour())
+    view.current?.color.lerpColors(NIGHT_VIEW, WHITE, daylight).lerp(DUSK_VIEW, warmth * 0.45)
+  })
   const taskKey = JSON.stringify(tasks.map(({ title, status, assignee }) => ({ title, status, assignee })))
   // Use content rather than polling object identity to avoid rebuilding the board every poll.
   const board = useMemo(() => kanbanTexture(JSON.parse(taskKey) as Task[], available, partial), [taskKey, available, partial])
@@ -30,7 +43,7 @@ export function CompanyEnvironment({ layout, tasks, available, partial, onOpenBo
     <RBox position={[b.minX, 1.9, (b.minZ + b.maxZ) / 2]} size={[0.15, 3.8, depth]} color="#ddd2bd"/>
     <RBox position={[b.maxX, 1.4, (b.minZ + b.maxZ) / 2]} size={[0.15, 2.8, depth]} color="#d3c7b3"/>
     {/* City windows behind the workspace / private manager rooms. */}
-    <mesh position={[(lx - 1) / 2, 2, b.minZ + 0.09]}><planeGeometry args={[lx - 1, 3.35]}/><meshBasicMaterial map={skyline}/></mesh>
+    <mesh position={[(lx - 1) / 2, 2, b.minZ + 0.09]}><planeGeometry args={[lx - 1, 3.35]}/><meshBasicMaterial ref={view} map={skyline}/></mesh>
     {Array.from({ length: Math.ceil((lx - 1) / 1.5) + 1 }, (_, i) => <RBox key={i} position={[i * (lx - 1) / Math.ceil((lx - 1) / 1.5), 2, b.minZ + 0.13]} size={[0.05, 3.4, 0.05]} color="#344944"/>)}
     {[0.34, 3.7].map((y) => <RBox key={y} position={[(lx - 1) / 2, y, b.minZ + 0.13]} size={[lx - 1, 0.06, 0.06]} color="#344944"/>)}
     {/* Glass partitions and explicit door openings share geometry with pathfinding. */}

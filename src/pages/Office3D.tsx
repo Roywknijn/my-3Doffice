@@ -4,6 +4,7 @@ import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { officeStateBadge } from '../office-state.ts'
 import { agentLook } from '../agents.ts'
+import { currentHour, dayCycle } from '../day-cycle.ts'
 import { clampTarget, companyLayout, companyPlacements, deskPlacement, officeRole, subagentPlacements, subagentStart, type CompanyLayout, type CompanyPlacement, type Vec3 } from '../company-layout.ts'
 import { activityWalkPath, billiardShot, IdleDirector, sipMotion } from '../idle-activities.ts'
 import { CoffeeMug } from '../scene3d/idle-props.tsx'
@@ -27,6 +28,24 @@ function Character({ station, placement, layout, onSelect, anchor, arrivals, poo
   const head = useRef<THREE.Group>(null)
   const mug = useRef<THREE.Group>(null)
   const cue = useRef<THREE.Group>(null)
+  const leftEye = useRef<THREE.Group>(null)
+  const rightEye = useRef<THREE.Group>(null)
+  const dots = useRef<THREE.Group>(null)
+  const pop = useRef<THREE.Group>(null)
+  const popRing = useRef<THREE.Mesh>(null)
+  const popSparks = useRef<THREE.Group>(null)
+  const dust = useRef<THREE.Group>(null)
+  const sit = useRef(0)
+  const speed = useRef(0)
+  const lastStep = useRef(0)
+  const nextPuff = useRef(0)
+  const puffAge = useRef([9, 9, 9, 9])
+  const waveUntil = useRef(0)
+  const waved = useRef(new Map<string, number>())
+  const prevState = useRef(station.state)
+  const popAt = useRef(-9)
+  // Desynchronizes blinking, glances and stretches between agents.
+  const phase = useMemo(() => [...station.id].reduce((sum, char) => sum + char.charCodeAt(0) * 7, 0) % 628 / 100, [station.id])
   const approach = useRef<Vec3 | undefined>(undefined)
   const cupTarget = useMemo(() => new THREE.Vector3(), [])
   const armTarget = useMemo(() => new THREE.Vector3(), [])
@@ -47,6 +66,12 @@ function Character({ station, placement, layout, onSelect, anchor, arrivals, poo
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [destination, layout])
 
+  useEffect(() => {
+    const group = root.current
+    if (group) crowd.set(station.id, group)
+    return () => { crowd.delete(station.id) }
+  }, [station.id])
+
   useFrame((state, delta) => {
     const group = root.current
     if (!group) return
@@ -64,12 +89,15 @@ function Character({ station, placement, layout, onSelect, anchor, arrivals, poo
         path.current.shift()
       } else {
         walking = true
-        group.position.add(toNext.normalize().multiplyScalar(Math.min(distance, delta * 2.6)))
+        // Ease in from rest and slow for the last stretch of the route.
+        speed.current = THREE.MathUtils.damp(speed.current, path.current.length <= 1 && distance < 0.6 ? 1.1 : 2.6, 6, delta)
+        group.position.add(toNext.normalize().multiplyScalar(Math.min(distance, Math.max(speed.current, 0.5) * delta)))
         const heading = Math.atan2(toNext.x, toNext.z)
         group.rotation.y += Math.atan2(Math.sin(heading - group.rotation.y), Math.cos(heading - group.rotation.y)) * 0.25
       }
     }
     walking = walking || path.current.length > 0
+    if (!walking) speed.current = THREE.MathUtils.damp(speed.current, 0, 10, delta)
     const arrived = !walking && Math.hypot(group.position.x - placement.position[0], group.position.z - placement.position[2]) < 0.08
     if (idle && arrived) arrivals.current.set(station.id, idle.token)
     else arrivals.current.delete(station.id)
@@ -80,33 +108,93 @@ function Character({ station, placement, layout, onSelect, anchor, arrivals, poo
     const shot = billiardShot(now, poolPlayers)
     const shooting = billiards && shot.slot === idle.slot
     if (!walking) group.rotation.y += Math.atan2(Math.sin(placement.facing - group.rotation.y), Math.cos(placement.facing - group.rotation.y)) * 0.12
-    const swing = walking ? Math.sin(time * 10) * 0.6 : 0
+    const stride = walking ? Math.max(0.35, Math.min(1, speed.current / 2.6)) : 0
+    const swing = Math.sin(time * 10) * 0.6 * stride
     const seated = arrived && placement.seated
+    sit.current = THREE.MathUtils.damp(sit.current, seated ? 1 : 0, 9, delta)
+    const working = station.state === 'Working' || station.state === 'Reviewing'
+    const typing = !walking && placement.intent === 'desk' && working
+    const resting = arrived && station.state === 'Idle' && !lounge && !brewing && !billiards
+    const stretchTime = (time + phase * 3) % 24
+    const stretch = resting && stretchTime < 2.6 ? Math.sin((stretchTime / 2.6) * Math.PI) : 0
+    if (walking && time > waveUntil.current) {
+      const fx = Math.sin(group.rotation.y); const fz = Math.cos(group.rotation.y)
+      for (const [id, other] of crowd) {
+        if (id === station.id || time - (waved.current.get(id) ?? -99) < 25) continue
+        const dx = other.position.x - group.position.x; const dz = other.position.z - group.position.z
+        const distance = Math.hypot(dx, dz)
+        if (distance > 0.3 && distance < 1.7 && (dx * fx + dz * fz) / distance > 0.5) { waveUntil.current = time + 1.4; waved.current.set(id, time); break }
+      }
+    }
+    const waving = time < waveUntil.current
     if (leftLeg.current && rightLeg.current) {
-      leftLeg.current.rotation.x = seated ? -Math.PI / 2.2 : swing
-      rightLeg.current.rotation.x = seated ? -Math.PI / 2.2 : -swing
+      leftLeg.current.rotation.x = THREE.MathUtils.lerp(swing, -Math.PI / 2.2, sit.current)
+      rightLeg.current.rotation.x = THREE.MathUtils.lerp(-swing, -Math.PI / 2.2, sit.current)
     }
     if (leftArm.current && rightArm.current) {
       leftArm.current.scale.y = rightArm.current.scale.y = 1
-      const typing = !walking && placement.intent === 'desk' && (station.state === 'Working' || station.state === 'Reviewing')
       const talking = !walking && (placement.intent === 'handoff' || placement.intent === 'meeting' || station.state === 'Collaborating' || (lounge && !!idle.peer && elapsed % 10 < 5))
       leftArm.current.rotation.set(0, 0, 0); rightArm.current.rotation.set(0, 0, 0)
       leftArm.current.rotation.x = walking ? -swing : typing ? -1.1 + Math.sin(time * 14) * 0.12 : talking ? -0.4 + Math.sin(time * 3) * 0.3 : 0
       rightArm.current.rotation.x = walking ? swing : typing ? -1.1 + Math.cos(time * 14) * 0.12 : 0
       if (brewing) leftArm.current.rotation.x = -1.7 + Math.sin(time * 4) * 0.16
+      if (waving && !brewing) { rightArm.current.rotation.x = -2.5; rightArm.current.rotation.z = -0.2 + Math.sin(time * 14) * 0.4 }
+      if (stretch > 0) leftArm.current.rotation.x = rightArm.current.rotation.x = THREE.MathUtils.lerp(0, -2.9, stretch)
       if (shooting) { leftArm.current.rotation.x = -1.4; rightArm.current.rotation.x = -1.3 + Math.sin(shot.phase * 6) * 0.12 }
     }
     if (body.current) {
       const talk = station.state === 'Collaborating' && !walking ? Math.abs(Math.sin(time * 5)) * 0.03 : 0
       const breathe = station.state === 'Idle' ? Math.sin(time * 2) * 0.015 : 0
-      body.current.position.y = (seated ? -0.14 : 0) + talk + breathe
-      body.current.rotation.x = shooting ? 0.25 : 0
+      const bob = walking ? Math.abs(Math.sin(time * 10)) * 0.035 * stride : 0
+      body.current.position.y = -0.14 * sit.current + talk + breathe + bob
+      body.current.rotation.x = shooting ? 0.25 : -0.1 * stretch
+      body.current.rotation.z = walking ? Math.sin(time * 10) * 0.03 * stride : 0
+    }
+    const blink = (time + phase) % 3.8 < 0.12 || stretch > 0.4 ? 0.1 : 1
+    if (leftEye.current && rightEye.current) leftEye.current.scale.y = rightEye.current.scale.y = blink
+    if (dots.current) {
+      dots.current.visible = typing
+      if (typing) dots.current.children.forEach((dot, i) => { const t = Math.max(0, Math.sin(time * 6 - i * 0.9)); dot.position.y = t * 0.07; dot.scale.setScalar(0.75 + t * 0.5) })
+    }
+    if (prevState.current !== station.state) {
+      if ((prevState.current === 'Working' || prevState.current === 'Reviewing') && station.state === 'Idle') popAt.current = time
+      prevState.current = station.state
+    }
+    const popAge = time - popAt.current
+    if (pop.current) {
+      pop.current.visible = popAge >= 0 && popAge < 1.8
+      if (pop.current.visible) {
+        const k = popAge / 1.8
+        if (popRing.current) { popRing.current.scale.setScalar(0.3 + k * 1.5); (popRing.current.material as THREE.MeshBasicMaterial).opacity = 0.7 * (1 - k) }
+        popSparks.current?.children.forEach((spark, i) => {
+          const angle = (i / 6) * Math.PI * 2 + 0.5; const radius = 0.25 + k * 0.7
+          spark.position.set(Math.cos(angle) * radius, 1 + k * 0.9 + Math.sin(k * Math.PI) * 0.2, Math.sin(angle) * radius)
+          spark.scale.setScalar(Math.max(0.01, 1 - k))
+        })
+      }
+    }
+    if (dust.current) {
+      const step = Math.sign(Math.sin(time * 10))
+      if (walking && stride > 0.6 && step !== lastStep.current) {
+        lastStep.current = step
+        const index = nextPuff.current++ % 4
+        puffAge.current[index] = 0
+        dust.current.children[index].position.set(group.position.x - Math.sin(group.rotation.y) * 0.15 + step * 0.1 * Math.cos(group.rotation.y), 0.06, group.position.z - Math.cos(group.rotation.y) * 0.15 - step * 0.1 * Math.sin(group.rotation.y))
+      } else if (!walking) lastStep.current = 0
+      dust.current.children.forEach((puff, i) => {
+        const age = puffAge.current[i] += delta
+        puff.visible = age < 0.6
+        if (puff.visible) { puff.scale.setScalar(0.5 + age * 2.2); ((puff as THREE.Mesh).material as THREE.MeshBasicMaterial).opacity = 0.28 * (1 - age / 0.6) }
+      })
     }
     if (head.current) {
       const lookingAt = lounge ? idle.peer && elapsed % 10 < 5 ? idle.peer : [layout.loungeX + 3.2, 1.55, -1] : undefined
       const angle = lookingAt ? Math.atan2(lookingAt[0] - group.position.x, lookingAt[2] - group.position.z) - group.rotation.y : 0
-      const target = lookingAt ? Math.max(-0.85, Math.min(0.85, Math.atan2(Math.sin(angle), Math.cos(angle)))) : 0
+      // Between tasks an agent glances around now and then; while typing they mostly look at the screen.
+      const glance = Math.sin((time + phase) * 0.6) * (Math.sin((time + phase) * 0.23) > 0.3 ? (working ? 0.15 : 0.5) : 0.04)
+      const target = lookingAt ? Math.max(-0.85, Math.min(0.85, Math.atan2(Math.sin(angle), Math.cos(angle)))) : walking ? 0 : glance
       head.current.rotation.y = THREE.MathUtils.damp(head.current.rotation.y, target, 5, delta)
+      head.current.rotation.x = -0.3 * stretch
     }
     if (cue.current) {
       cue.current.visible = billiards
@@ -141,7 +229,8 @@ function Character({ station, placement, layout, onSelect, anchor, arrivals, poo
     }
   })
 
-  return <group ref={root} position={start}>
+  return <>
+  <group ref={root} position={start}>
     <group ref={body} scale={scale} onClick={onSelect && ((event) => { event.stopPropagation(); onSelect(station, null) })} onPointerOver={onSelect && (() => { document.body.style.cursor = 'pointer' })} onPointerOut={onSelect && (() => { document.body.style.cursor = '' })}>
       <mesh ref={leftLeg} position={[-0.11, 0.66, 0]} castShadow geometry={legGeometry}><meshStandardMaterial color={tint(colors.pants)} roughness={0.8}/></mesh>
       <mesh ref={rightLeg} position={[0.11, 0.66, 0]} castShadow geometry={legGeometry}><meshStandardMaterial color={tint(colors.pants)} roughness={0.8}/></mesh>
@@ -152,17 +241,27 @@ function Character({ station, placement, layout, onSelect, anchor, arrivals, poo
         <RBox position={[0, 0, 0]} size={[0.4, 0.4, 0.37]} radius={0.08} color={tint(colors.skin)} roughness={0.7}/>
         <RBox position={[0, 0.22, -0.02]} size={[0.43, 0.13, 0.41]} radius={0.05} color={tint(colors.hair)} roughness={0.9}/>
         <RBox position={[0, 0.08, -0.19]} size={[0.43, 0.3, 0.06]} radius={0.03} color={tint(colors.hair)} roughness={0.9}/>
-        <RBox position={[-0.09, 0.02, 0.186]} size={[0.06, 0.07, 0.01]} radius={0.004} color="#17201e" shadow={false}/>
-        <RBox position={[0.09, 0.02, 0.186]} size={[0.06, 0.07, 0.01]} radius={0.004} color="#17201e" shadow={false}/>
+        <group ref={leftEye} position={[-0.09, 0.02, 0.186]}><RBox position={[0, 0, 0]} size={[0.06, 0.07, 0.01]} radius={0.004} color="#17201e" shadow={false}/></group>
+        <group ref={rightEye} position={[0.09, 0.02, 0.186]}><RBox position={[0, 0, 0]} size={[0.06, 0.07, 0.01]} radius={0.004} color="#17201e" shadow={false}/></group>
         <RBox position={[0, -0.1, 0.186]} size={[0.12, 0.025, 0.01]} radius={0.004} color="#9a5a44" shadow={false}/>
       </group>
       {unknown && <mesh position={[0, 0.03, 0]} rotation={[-Math.PI / 2, 0, 0]}><ringGeometry args={[0.45, 0.55, 24]}/><meshBasicMaterial color="#e9c47b" transparent opacity={0.85}/></mesh>}
+      <group ref={dots} position={[0, 1.95, 0]} visible={false}>{[-0.13, 0, 0.13].map((x) => <mesh key={x} position={[x, 0, 0]}><sphereGeometry args={[0.04, 8, 6]}/><meshBasicMaterial color="#58857b"/></mesh>)}</group>
       <object3D ref={anchor} position={[0, 2.05, 0]}/>
+    </group>
+    <group ref={pop} visible={false}>
+      <mesh ref={popRing} position={[0, 0.05, 0]} rotation={[-Math.PI / 2, 0, 0]}><ringGeometry args={[0.85, 1, 32]}/><meshBasicMaterial color="#6fc7a1" transparent opacity={0.7} depthWrite={false} side={THREE.DoubleSide}/></mesh>
+      <group ref={popSparks}>{Array.from({ length: 6 }, (_, i) => <mesh key={i}><octahedronGeometry args={[0.07]}/><meshBasicMaterial color="#ffd66b"/></mesh>)}</group>
     </group>
     <CoffeeMug ref={mug}/>
     <group ref={cue} visible={false}><mesh rotation={[Math.PI / 2, 0, 0]} castShadow><cylinderGeometry args={[0.014, 0.024, 2.2, 8]}/><meshStandardMaterial color="#d4b27e"/></mesh></group>
   </group>
+  <group ref={dust}>{[0, 1, 2, 3].map((i) => <mesh key={i} visible={false}><sphereGeometry args={[0.1, 8, 6]}/><meshBasicMaterial color="#d8cdb8" transparent opacity={0} depthWrite={false}/></mesh>)}</group>
+  </>
 }
+
+/** Every character's root, so a walking agent can notice a colleague and wave. */
+const crowd = new Map<string, THREE.Object3D>()
 
 // Legs and arms pivot at the hip / shoulder: translate the geometry so its top sits at the origin.
 const legGeometry = new THREE.BoxGeometry(0.17, 0.62, 0.2).translate(0, -0.31, 0)
@@ -302,13 +401,27 @@ function useClock(interval: number) {
   return now
 }
 
-/** Neutral daylight keeps the office readable in either application theme. */
+const DAY_SKY = new THREE.Color('#eae4db'); const NIGHT_SKY = new THREE.Color('#2b3446'); const DUSK_SKY = new THREE.Color('#e8b88a')
+const DAY_SUN = new THREE.Color('#fff4dd'); const NIGHT_SUN = new THREE.Color('#9db3e6'); const DUSK_SUN = new THREE.Color('#ffb878')
+
+/** Daylight that follows the real time of day (see day-cycle.ts), never darker than 60% so the office stays readable. */
 function Lighting() {
+  const scene = useThree((state) => state.scene)
+  const hemisphere = useRef<THREE.HemisphereLight>(null)
+  const sun = useRef<THREE.DirectionalLight>(null)
+  const ambient = useRef<THREE.AmbientLight>(null)
+  useFrame(() => {
+    const { daylight, warmth, light } = dayCycle(currentHour())
+    ;(scene.background as THREE.Color).lerpColors(NIGHT_SKY, DAY_SKY, daylight).lerp(DUSK_SKY, warmth * 0.4)
+    if (hemisphere.current) hemisphere.current.intensity = 1.7 * light
+    if (ambient.current) ambient.current.intensity = 0.45 * light
+    if (sun.current) { sun.current.intensity = 2.4 * light; sun.current.color.lerpColors(NIGHT_SUN, DAY_SUN, daylight).lerp(DUSK_SUN, warmth * 0.6) }
+  })
   return <>
     <color attach="background" args={['#eae4db']}/>
-    <hemisphereLight args={['#fff8e9', '#9b8d74', 1.7]}/>
-    <directionalLight position={[-3, 20, 8]} intensity={2.4} color="#fff4dd" castShadow shadow-mapSize={[2048, 2048]} shadow-bias={-0.0004} shadow-camera-left={-30} shadow-camera-right={30} shadow-camera-top={25} shadow-camera-bottom={-25} shadow-camera-far={80}/>
-    <ambientLight intensity={0.45}/>
+    <hemisphereLight ref={hemisphere} args={['#fff8e9', '#9b8d74', 1.7]}/>
+    <directionalLight ref={sun} position={[-3, 20, 8]} intensity={2.4} color="#fff4dd" castShadow shadow-mapSize={[2048, 2048]} shadow-bias={-0.0004} shadow-camera-left={-30} shadow-camera-right={30} shadow-camera-top={25} shadow-camera-bottom={-25} shadow-camera-far={80}/>
+    <ambientLight ref={ambient} intensity={0.45}/>
   </>
 }
 
