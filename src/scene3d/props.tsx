@@ -1,7 +1,9 @@
-import { useMemo, type ReactNode } from 'react'
+import { useFrame } from '@react-three/fiber'
+import { useMemo, useRef, type ReactNode } from 'react'
 import * as THREE from 'three'
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
 import type { Vec3 } from '../company-layout.ts'
+import { Steam } from './ambient.tsx'
 import { screenTexture } from './textures.ts'
 
 // Low-poly props built from primitives. Rounded edges and PBR materials keep them from
@@ -53,6 +55,10 @@ export function OfficeChair({ position, rotation = 0, color = '#2f3a44' }: { pos
 
 export function WorkDesk({ position, active, withChair = true }: { position: Vec3; active: boolean; withChair?: boolean }) {
   const screen = useMemo(() => screenTexture(active), [active])
+  const glass = useRef<THREE.MeshStandardMaterial>(null)
+  const phase = position[0] * 1.7 + position[2]
+  // A working monitor shimmers slightly, like changing content on screen.
+  useFrame(({ clock }) => { if (glass.current && active) glass.current.emissiveIntensity = 0.86 + Math.sin(clock.elapsedTime * 3.1 + phase) * 0.06 + Math.sin(clock.elapsedTime * 11.7 + phase * 2) * 0.04 })
   return <Group position={position}>
     <RBox position={[0, 0.74, 0]} size={[1.9, 0.07, 0.95]} radius={0.03} color="#d9c3a0" roughness={0.6}/>
     <RBox position={[-0.9, 0.37, 0]} size={[0.06, 0.72, 0.85]} radius={0.02} color="#e7e2d8"/>
@@ -60,7 +66,7 @@ export function WorkDesk({ position, active, withChair = true }: { position: Vec
     <RBox position={[0.55, 0.52, 0.02]} size={[0.42, 0.4, 0.8]} radius={0.02} color="#e7e2d8"/>
     {/* Monitor */}
     <RBox position={[0, 1.13, 0.22]} size={[0.86, 0.52, 0.05]} radius={0.02} color="#1c2024" roughness={0.4}/>
-    <mesh position={[0, 1.13, 0.194]} rotation={[0, Math.PI, 0]}><planeGeometry args={[0.8, 0.46]}/><meshStandardMaterial map={screen} emissive={active ? '#ffffff' : '#000000'} emissiveMap={screen} emissiveIntensity={active ? 0.9 : 0} roughness={0.3}/></mesh>
+    <mesh position={[0, 1.13, 0.194]} rotation={[0, Math.PI, 0]}><planeGeometry args={[0.8, 0.46]}/><meshStandardMaterial ref={glass} map={screen} emissive={active ? '#ffffff' : '#000000'} emissiveMap={screen} emissiveIntensity={active ? 0.9 : 0} roughness={0.3}/></mesh>
     <Cyl position={[0, 0.88, 0.25]} radius={0.03} height={0.22} color="#2a2f33"/>
     <RBox position={[0, 0.785, 0.28]} size={[0.3, 0.02, 0.18]} radius={0.01} color="#2a2f33"/>
     {/* Keyboard, mouse and a mug of kopi */}
@@ -68,6 +74,7 @@ export function WorkDesk({ position, active, withChair = true }: { position: Vec
     <RBox position={[0.42, 0.79, -0.18]} size={[0.07, 0.03, 0.11]} radius={0.02} color="#3a4046"/>
     <Cyl position={[-0.65, 0.84, -0.1]} radius={0.05} height={0.12} color="#f4efe6"/>
     <Cyl position={[-0.65, 0.901, -0.1]} radius={0.043} height={0.005} color="#3b2415"/>
+    <Steam position={[-0.65, 0.91, -0.1]} size={0.022} height={0.3} visible={active}/>
     {withChair && <OfficeChair position={[0, 0, -0.78]}/>}
   </Group>
 }
@@ -91,9 +98,12 @@ export function Armchair({ position, rotation = 0, color }: { position: Vec3; ro
 }
 
 export function Plant({ position, size = 1 }: { position: Vec3; size?: number }) {
+  const leaves = useRef<THREE.Group>(null)
+  const phase = position[0] * 0.9 + position[2] * 1.3
+  useFrame(({ clock }) => { if (leaves.current) leaves.current.rotation.set(Math.cos(clock.elapsedTime * 0.7 + phase) * 0.025, 0, Math.sin(clock.elapsedTime * 0.9 + phase) * 0.035) })
   return <Group position={position} scale={size}>
     <Cyl position={[0, 0.22, 0]} radius={0.2} top={0.26} height={0.44} color="#b0643a" roughness={0.8}/>
-    {[[0, 0.75, 0, 0.32], [0.14, 0.95, 0.05, 0.22], [-0.12, 0.92, -0.06, 0.24], [0, 1.12, 0, 0.18]].map(([x, y, z, r]) => <mesh key={`${x}${y}`} position={[x, y, z]} castShadow><icosahedronGeometry args={[r, 1]}/><meshStandardMaterial color="#4f8a4a" roughness={0.85} flatShading/></mesh>)}
+    <group ref={leaves} position={[0, 0.5, 0]}><group position={[0, -0.5, 0]}>{[[0, 0.75, 0, 0.32], [0.14, 0.95, 0.05, 0.22], [-0.12, 0.92, -0.06, 0.24], [0, 1.12, 0, 0.18]].map(([x, y, z, r]) => <mesh key={`${x}${y}`} position={[x, y, z]} castShadow><icosahedronGeometry args={[r, 1]}/><meshStandardMaterial color="#4f8a4a" roughness={0.85} flatShading/></mesh>)}</group></group>
   </Group>
 }
 
