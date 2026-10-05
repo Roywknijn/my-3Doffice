@@ -50,7 +50,7 @@ export function TranscriptDialog({ session, onClose }: { session: Session & { id
         <Field label="Tokens" value={tokens}/>
         <Field label="Estimated cost" value={transcript.estimatedCostUsd ? `$${transcript.estimatedCostUsd.toFixed(4)}` : undefined}/>
       </dl>
-      <p className="muted transcript-note">Read-only. Secrets are redacted by Hermes and again by MyCompany; the system prompt and model reasoning are not shown.</p>
+      <p className="muted transcript-note">Read-only. Secrets are redacted by Hermes and again by StoneBox SaaS AI+ERP; the system prompt and model reasoning are not shown.</p>
       {transcript.omitted > 0 && <p className="file-notice">{transcript.omitted} older message{transcript.omitted === 1 ? ' is' : 's are'} not shown.</p>}
       {transcript.messages.length === 0 ? <p className="muted">This session has no messages.</p> : <ol className="transcript">{transcript.messages.map((message, index) => <Message key={index} message={message}/>)}</ol>}
     </>}

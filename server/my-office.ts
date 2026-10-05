@@ -1023,7 +1023,7 @@ export function buildOfficeSnapshot(runtime: RuntimeSnapshot, board: TaskBoardSn
       ? live.probe.active ? `${live.probe.label ?? 'Active'}${live.probe.lastSeen ? ` (last log ${live.probe.lastSeen})` : ''}` : `No activity in the last ${ACTIVITY_WINDOW}`
       : activity.sessions.availability === 'unavailable' ? 'Not Available' : collaboration === 'Collaborating' ? 'Attributed active collaboration session' : 'No attributed recent activity'
     const runtimeProvenance = `Gateway ${gateway ?? 'Unknown'} (hermes profile list)`
-    const managedIdle = state === 'Idle' ? '; MyCompany managed-idle placement policy (not agent-reported presence)' : ''
+    const managedIdle = state === 'Idle' ? '; StoneBox SaaS AI+ERP managed-idle placement policy (not agent-reported presence)' : ''
     const liveProvenance = options.agentActivity ? `; live activity (hermes -p ${agent.profile} logs/sessions, last ${ACTIVITY_WINDOW}): ${!agentActivity || !live.known ? 'unavailable' : live.state !== 'Unknown' ? live.probe?.kind ?? 'active' : 'none'}` : ''
     const gatewayProvenance = options.hermesRuntime ? `; gateway runtime (gateway_state.json, delegation manifests): ${!hermesRuntime ? 'unavailable' : `${busy ? 'busy' : 'not busy'}, ${delegating} running subagent${delegating === 1 ? '' : 's'}`}` : ''
     return {
