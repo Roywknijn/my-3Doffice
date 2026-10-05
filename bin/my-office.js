@@ -5,7 +5,7 @@ import { existsSync, readFileSync } from 'node:fs'
 const packageJson = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
 const args = process.argv.slice(2)
 
-const help = `MyCompany · Hermes 3D Virtual Office ${packageJson.version}
+const help = `StoneBox SaaS AI+ERP · Hermes 3D Virtual Office ${packageJson.version}
 A 3D virtual office and read-only workspace for your Hermes Agent crew.
 
 Usage: my-office [options]
@@ -35,7 +35,7 @@ for (let index = 0; index < args.length; index += 1) {
 
 const server = new URL('../build/server/index.js', import.meta.url)
 if (!existsSync(server)) {
-  console.error('MyCompany is not built. From a source checkout, run: npm run build')
+  console.error('StoneBox SaaS AI+ERP is not built. From a source checkout, run: npm run build')
   process.exit(1)
 }
 await import(server.href)

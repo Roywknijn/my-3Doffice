@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-MyCompany (package/CLI name `my-office`; repo github.com/kansaok/my-office) — a **read-only** 3D virtual office + dashboard for a Hermes Agent crew. It never creates, edits or runs Hermes tasks; it only runs a fixed allowlist of `hermes` read commands and visualizes the result.
+StoneBox SaaS AI+ERP (package/CLI name `my-office`; repo github.com/kansaok/my-office) — a **read-only** 3D virtual office + dashboard for a Hermes Agent crew. It never creates, edits or runs Hermes tasks; it only runs a fixed allowlist of `hermes` read commands and visualizes the result.
 
 ## Commands
 

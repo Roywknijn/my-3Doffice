@@ -69,7 +69,7 @@ function processUser(): string {
 export function fsError(error: unknown, what: string, where?: string): FolderError {
   const code = (error as NodeJS.ErrnoException | undefined)?.code
   const user = processUser()
-  if (code === 'EACCES' || code === 'EPERM') return new FolderError(`Permission denied: MyCompany runs as "${user}" and cannot read ${what}. Run MyCompany as the user that owns this Hermes profile, or grant read access, for example: sudo setfacl -R -m u:${user}:rX ${where ?? '<folder>'}`, 403)
+  if (code === 'EACCES' || code === 'EPERM') return new FolderError(`Permission denied: StoneBox SaaS AI+ERP runs as "${user}" and cannot read ${what}. Run StoneBox SaaS AI+ERP as the user that owns this Hermes profile, or grant read access, for example: sudo setfacl -R -m u:${user}:rX ${where ?? '<folder>'}`, 403)
   if (code === 'ENOENT' || code === 'ENOTDIR') return new FolderError(`${what[0].toUpperCase()}${what.slice(1)} was not found.`, 404)
   if (code === 'ELOOP') return new FolderError(`${what[0].toUpperCase()}${what.slice(1)} is a symlink loop.`, 400)
   return new FolderError(`Could not read ${what} (${code ?? 'unknown error'}).`, 500)

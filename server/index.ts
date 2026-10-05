@@ -129,8 +129,8 @@ if (existsSync(distDirectory)) {
 
 app.use((error: unknown, _request: Request, response: Response, _next: NextFunction) => {
   void _next
-  console.error('MyCompany request failed:', error instanceof Error ? error.message : error)
+  console.error('StoneBox SaaS AI+ERP request failed:', error instanceof Error ? error.message : error)
   response.status(500).json({ error: 'Internal error' })
 })
 
-app.listen(PORT, HOST, () => console.log(`MyCompany listening on http://${HOST}:${PORT}${existsSync(distDirectory) ? ' (serving built UI)' : ' (API only; run the Vite dev server for the UI)'}`))
+app.listen(PORT, HOST, () => console.log(`StoneBox SaaS AI+ERP listening on http://${HOST}:${PORT}${existsSync(distDirectory) ? ' (serving built UI)' : ' (API only; run the Vite dev server for the UI)'}`))

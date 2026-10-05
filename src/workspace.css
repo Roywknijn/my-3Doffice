@@ -1,4 +1,4 @@
-/* MyCompany workspace: warm paper, ink, and one restrained blue accent.
+/* StoneBox SaaS AI+ERP workspace: warm paper, ink, and one restrained blue accent.
    Component tokens resolve here; 2D/3D illustration colors stay independent. */
 :root {
   --ui-font: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -269,7 +269,7 @@ aside.office-panel { grid-column: 2; grid-row: 2 / 4; position: relative; inset:
   .app .app-topbar { height: 58px; padding: 0 16px; }
   .header-actions { gap: 7px; }.sync-label { display: none; }
   .breadcrumb { font-size: 11px; gap: 8px; }
-  .app-topbar .header-title::after { content: 'MyCompany'; font: 600 13px var(--ui-font); letter-spacing: -.03em; color: var(--ink); }
+  .app-topbar .header-title::after { content: 'StoneBox SaaS AI+ERP'; font: 600 13px var(--ui-font); letter-spacing: -.03em; color: var(--ink); }
   .page-content, .page-content-office { padding: 24px 16px; }
   .office-page-title { margin-bottom: 22px; }
   .office-page-title h1 { font-size: 28px; }
